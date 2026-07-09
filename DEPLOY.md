@@ -1,64 +1,72 @@
-# Deploying to Hugging Face Spaces
+# Deploying to Google Cloud Run
 
-The whole app (React site + FastAPI + U-Net model) ships as **one Docker Space**.
-It's free (CPU basic: 2 vCPU / 16 GB), and the `Dockerfile` here is already verified
-to build and run. The model (`trained_model.pth`) rides along via **Git LFS**.
+The whole app (React site + FastAPI + U-Net) ships as **one Docker container**.
+Cloud Run runs that container, **scales to zero** when idle (so it costs ~$0 for
+portfolio traffic), and fits PyTorch. The container is already verified to build
+and run, and it listens on Cloud Run's `$PORT`.
 
-Final URL will look like: `https://<username>-forestfellow.hf.space`
+Final URL looks like: `https://forestfellow-xxxxxxxx-uc.a.run.app`
+
+> Cloud Run's free tier (2M requests + generous CPU/memory-seconds per month) and
+> scale-to-zero mean a low-traffic demo stays within $0. A billing account (card)
+> must be enabled on the Google project, but you won't be charged for this usage.
 
 ---
 
-## 1. Create a Hugging Face account
-Sign up (free): https://huggingface.co/join
+## 1. Create a Google Cloud project with billing
+- Go to https://console.cloud.google.com
+- Create a new project (e.g. **forestfellow**).
+- Enable **billing** on it (Billing → link a billing account; needs a card).
 
-## 2. Create a Write access token
-https://huggingface.co/settings/tokens → **New token** → type **Write** → copy it.
-(You'll paste it as the password when pushing.)
+## 2. Open Cloud Shell (no local install needed)
+Click the **terminal icon** (top-right of the console) to open Cloud Shell —
+`gcloud`, `git`, and `git-lfs` are preinstalled.
 
-## 3. Create the Space
-https://huggingface.co/new-space
-- **Owner:** your username
-- **Space name:** `forestfellow`
-- **License:** MIT
-- **SDK:** **Docker** → **Blank** template
-- **Hardware:** CPU basic (free)
-- **Visibility:** Public
-
-## 4. Push this repo to the Space
-From the repo folder (`portfolio-apps/land-cover-segmentation`):
-
+## 3. Clone the repo and pull the model
 ```bash
-# add the Space as a second remote (replace <username>)
-git remote add space https://huggingface.co/spaces/<username>/forestfellow
-
-# push (the Space starts with its own README commit, so force the first push)
-git push --force space main
+git clone https://github.com/kamranahmed678/forestfellow
+cd forestfellow
+git lfs pull                      # fetch the real 66 MB model (not the pointer)
+ls -lh trained_model.pth          # confirm it's ~66M, NOT ~130 bytes
 ```
 
-When git asks for credentials:
-- **Username:** your Hugging Face username
-- **Password:** the **Write token** from step 2
-
-Git LFS uploads the 66 MB model automatically.
-
-## 5. Watch it build
-Open `https://huggingface.co/spaces/<username>/forestfellow` → the **Logs** tab.
-The Docker build takes ~4–8 min (installs PyTorch, builds React). When it flips to
-**Running**, the app is live at `https://<username>-forestfellow.hf.space`.
+## 4. Deploy
+```bash
+gcloud run deploy forestfellow \
+  --source . \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --memory 2Gi \
+  --cpu 2 \
+  --timeout 300
+```
+- On first run it asks to enable the **Cloud Run / Cloud Build / Artifact Registry**
+  APIs — answer **Y**.
+- It uploads the source, builds the `Dockerfile` (Cloud Build), and deploys.
+  Takes ~5–10 min the first time.
+- At the end it prints a **Service URL** — that's your live app. 🎉
 
 ---
 
 ## Notes
-- **Cold start:** free Spaces sleep after inactivity. The first visit after a nap
-  takes ~20–30 s to wake — the site already shows a "waking the model" message.
-- **Updates:** just `git push space main` again; the Space rebuilds automatically.
-- **Both remotes:** `git push origin main` → GitHub (source), `git push space main`
-  → Hugging Face (live). You can push to both whenever you change something.
+- **Cold start:** with scale-to-zero, the first request after idle spins the
+  container up and loads the model (~15–30 s). The site shows a "waking the model"
+  message during that wait. (To avoid it you could set `--min-instances 1`, but
+  that keeps one instance always on and leaves the free tier — don't, for a demo.)
+- **Memory:** `2Gi` is comfortable for the U-Net. If you ever see it crash on big
+  images, bump to `--memory 4Gi`.
+- **Updates:** re-run the same `gcloud run deploy --source .` after `git pull`.
+- **Region:** `us-central1` is a safe free-tier region; any Cloud Run region works.
 
 ## Troubleshooting
-- **Build fails on torch:** the Dockerfile already installs CPU-only torch and pins
-  `numpy<2`; don't change those.
-- **Model missing / 500 on segment:** confirm `trained_model.pth` shows up in the
-  Space's **Files** tab as an LFS pointer (~66 MB). If not, ensure `git lfs` is
-  installed locally and re-push.
-- **Push rejected:** use `git push --force space main` for the very first push only.
+- **500 on /segment, model missing:** you skipped `git lfs pull` — `trained_model.pth`
+  was a 130-byte pointer. Pull it and redeploy.
+- **Build fails on torch/numpy:** the Dockerfile pins CPU torch + `numpy<2`; leave those.
+- **"Billing required":** enable billing on the project (step 1). Free-tier usage is $0.
+
+---
+
+### Alternative: Hugging Face
+HF now requires **PRO ($9/mo)** for Docker/Gradio (compute) Spaces; only Static
+Spaces are free. The repo is HF-ready (`README.md` has the Space config) if you
+ever take PRO — but Cloud Run above is the free path.
