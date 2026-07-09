@@ -21,7 +21,7 @@ WORKDIR /app
 RUN pip install --no-cache-dir torch==2.2.2 --index-url https://download.pytorch.org/whl/cpu \
  && pip install --no-cache-dir \
       fastapi==0.115.* "uvicorn[standard]==0.30.*" python-multipart==0.0.* \
-      pillow numpy
+      pillow "numpy<2"
 
 # backend code
 COPY backend/ ./

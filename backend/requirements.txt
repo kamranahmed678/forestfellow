@@ -2,5 +2,5 @@ fastapi
 uvicorn[standard]
 python-multipart
 torch
-numpy
+numpy<2
 pillow
