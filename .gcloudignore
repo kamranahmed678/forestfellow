@@ -1,0 +1,9 @@
+# keep the source upload to Cloud Build small.
+# NOTE: trained_model.pth is intentionally NOT ignored — it must be in the build.
+.git
+.gitattributes
+node_modules
+frontend/node_modules
+frontend/dist
+**/__pycache__
+*.pyc

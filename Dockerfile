@@ -31,5 +31,7 @@ COPY --from=frontend /fe/dist ./static
 COPY trained_model.pth ./trained_model.pth
 ENV MODEL_PATH=/app/trained_model.pth
 
+# Listen on $PORT if provided (Cloud Run sets it, default 8080), else 7860 (HF).
+ENV PORT=7860
 EXPOSE 7860
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-7860}"]
