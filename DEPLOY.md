@@ -22,13 +22,19 @@ Final URL looks like: `https://forestfellow-xxxxxxxx-uc.a.run.app`
 Click the **terminal icon** (top-right of the console) to open Cloud Shell —
 `gcloud`, `git`, and `git-lfs` are preinstalled.
 
-## 3. Clone the repo and pull the model
+## 3. Clone the repo and fetch the model
+Cloud Shell has **no git-lfs**, so a plain clone only gets the 133-byte LFS
+pointer. Download the real weights straight from GitHub's LFS media URL instead:
+
 ```bash
 git clone https://github.com/kamranahmed678/forestfellow
 cd forestfellow
-git lfs pull                      # fetch the real 66 MB model (not the pointer)
-ls -lh trained_model.pth          # confirm it's ~66M, NOT ~130 bytes
+wget -O trained_model.pth \
+  "https://media.githubusercontent.com/media/kamranahmed678/forestfellow/main/trained_model.pth"
+ls -lh trained_model.pth          # must be ~66M, NOT ~130 bytes
 ```
+> Re-run that `wget` any time you re-clone or `git pull` in Cloud Shell — the repo
+> only stores the LFS pointer, not the bytes.
 
 ## 4. Deploy
 ```bash
